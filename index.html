@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Magic Mixer Deluxe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            overscroll-behavior-y: contain; 
+        }
+
+        .color-swatch-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s ease-out;
+            padding-bottom: 4px; /* Space for label */
+        }
+        .color-swatch-container:hover {
+            transform: scale(1.05);
+        }
+
+        .color-swatch {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            border: 3px solid transparent;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            /* Ensure swatches are large enough for touch */
+            min-width: 40px; 
+            min-height: 40px;
+        }
+        .color-swatch:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border-color: #a78bfa; 
+        }
+        .color-swatch.dragging {
+            opacity: 0.6;
+            transform: scale(1.15);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .color-swatch:active {
+            cursor: grabbing;
+        }
+        .color-label {
+            font-size: 0.6rem; /* Slightly smaller for dense palette */
+            margin-top: 3px;
+            color: #4A5568; 
+            text-align: center;
+            width: 100%; /* Ensure label takes full width of container */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        @keyframes customPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
+        }
+        .title-animate-pulse {
+            animation: customPulse 2.5s infinite ease-in-out;
+        }
+
+        .ingredient-swatch, .saved-color-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 3px;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            vertical-align: middle;
+            cursor: pointer; 
+            transition: transform 0.1s ease-out;
+        }
+        .saved-color-swatch:hover {
+            transform: scale(1.15);
+        }
+        .ingredient-text {
+            vertical-align: middle;
+            font-size: 1em;
+            margin: 0 2px;
+        }
+
+        #mixingPot.clearing {
+            animation: clearPotAnim 0.5s ease-out forwards;
+        }
+        @keyframes clearPotAnim {
+            0% { transform: scale(1) rotate(0deg); opacity: 1; }
+            50% { transform: scale(1.1) rotate(10deg); opacity: 0.7; }
+            100% { transform: scale(0) rotate(-20deg); opacity: 0; }
+        }
+
+        #mixingPot.mixing {
+            animation: mixPotAnim 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+        }
+        @keyframes mixPotAnim { 
+            0% { transform: scale(1) rotate(0deg); }
+            30% { transform: scale(1.05) rotate(-15deg); }
+            60% { transform: scale(0.95) rotate(15deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        
+        .color-tip { 
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(5px);
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+            color: #5A3E8A; 
+            text-align: center;
+            margin-top: 10px;
+            transition: opacity 0.5s ease-in-out, background-color 0.3s ease, color 0.3s ease;
+            min-height: 38px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .button-icon {
+            margin-right: 6px;
+            font-size: 1.1em;
+        }
+        /* Ensure buttons are easy to tap on mobile */
+        .action-button {
+            padding: 10px 12px; /* Increased padding */
+            font-size: 0.8rem; /* sm:text-sm */
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .action-button {
+                padding: 0.5rem 1rem; /* px-3 py-2 sm:px-4 sm:py-2.5 */
+                font-size: 0.875rem;
+            }
+            .color-label {
+                font-size: 0.65rem;
+            }
+        }
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-sky-300 via-indigo-300 to-pink-300 min-h-screen flex flex-col items-center justify-start p-2 sm:p-4 text-gray-800 select-none">
+
+    <header class="my-4 md:my-6 w-full">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-purple-700 to-orange-600 title-animate-pulse">
+            🌈 Color Magic Mixer Deluxe ✨
+        </h1>
+    </header>
+
+    <main class="flex flex-col lg:flex-row items-start justify-around w-full max-w-7xl gap-4 md:gap-6">
+        <div class="w-full lg:w-2/5 flex flex-col gap-4 md:gap-6 order-2 lg:order-1">
+            <section id="colorPaletteContainer" class="p-3 sm:p-4 bg-white/70 backdrop-blur-md rounded-2xl shadow-xl">
+                <h2 class="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-center text-purple-700">Pick Your Colors!</h2>
+                <div id="colorPalette" class="grid grid-cols-4 sm:grid-cols-5 gap-x-1 gap-y-2 sm:gap-x-2 sm:gap-y-3">
+                    </div>
+            </section>
+
+            <section id="savedColorsContainer" class="p-3 sm:p-4 bg-white/70 backdrop-blur-md rounded-2xl shadow-xl">
+                <h2 class="text-lg sm:text-xl font-semibold mb-3 text-center text-rose-600">💖 My Saved Colors</h2>
+                <div id="savedColorsPalette" class="flex flex-wrap justify-center items-center gap-2 min-h-[40px]">
+                    <span id="noSavedColorsMsg" class="text-xs text-gray-500">Mix & save a color!</span>
+                </div>
+            </section>
+        </div>
+
+        <section id="mixingSection" class="w-full lg:w-auto flex flex-col items-center p-3 sm:p-4 bg-white/70 backdrop-blur-md rounded-2xl shadow-xl order-1 lg:order-2">
+            <h2 class="text-xl sm:text-2xl font-semibold mb-3 text-center text-teal-700">Mixing Pot</h2>
+            <div id="mixingPot" class="w-40 h-40 sm:w-52 md:w-56 sm:h-52 md:h-56 rounded-full border-8 border-dashed border-gray-400 flex items-center justify-center text-center text-base sm:text-lg text-gray-500/80 bg-white transition-all duration-300 ease-in-out shadow-inner mb-3 relative overflow-hidden p-1">
+                <span id="potInstruction" class="transition-opacity duration-300">Drag a color here!</span>
+            </div>
+            <div id="mixedColorInfo" class="text-center h-12 sm:h-14 mb-1">
+                <p class="text-lg sm:text-xl font-medium" id="mixedColorNameMessage">You made: <span id="mixedColorName" class="font-bold">White</span></p>
+                <p class="text-xs text-gray-600" id="mixedColorHex">#FFFFFF</p>
+            </div>
+            <div id="ingredientDisplay" class="text-center text-xs sm:text-sm text-gray-700 h-8 flex items-center justify-center mb-2">
+                 <span id="ingredientTextInfo">Mix something!</span>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-2 sm:gap-3 mb-3">
+                <button id="undoButton" class="action-button bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-semibold rounded-lg shadow-md hover:from-amber-600 hover:to-yellow-600 transition-all transform hover:scale-105 active:scale-95 flex items-center" disabled>
+                    <span class="button-icon">↩️</span>Undo
+                </button>
+                <button id="saveColorButton" class="action-button bg-gradient-to-r from-emerald-500 to-green-500 text-white font-semibold rounded-lg shadow-md hover:from-emerald-600 hover:to-green-600 transition-all transform hover:scale-105 active:scale-95 flex items-center" disabled>
+                    <span class="button-icon">💾</span>Save Color
+                </button>
+                <button id="clearButton" class="action-button bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-lg shadow-md hover:from-red-600 hover:to-orange-600 transition-all transform hover:scale-105 active:scale-95 flex items-center">
+                    <span class="button-icon">🗑️</span>Clear Mixer
+                </button>
+            </div>
+             <div id="colorTipDisplay" class="color-tip opacity-0 w-full max-w-xs">
+                </div>
+        </section>
+    </main>
+
+    <footer class="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-gray-700">
+        <p>Let your imagination sparkle! ✨ Happy Mixing!</p>
+    </footer>
+
+    <script>
+        const paletteColors = [
+            { name: "Red", hex: "#EF4444" }, { name: "Yellow", hex: "#EAB308" }, { name: "Blue", hex: "#3B82F6" },
+            { name: "Orange", hex: "#F97316" }, { name: "Green", hex: "#22C55E" }, { name: "Purple", hex: "#8B5CF6" },
+            { name: "Pink", hex: "#EC4899" }, { name: "Cyan", hex: "#06B6D4" }, { name: "Lime", hex: "#84CC16"},
+            { name: "Forest Green", hex: "#228B22" }, { name: "Olive", hex: "#808000" }, { name: "Terracotta", hex: "#E2725B" },
+            { name: "Sand", hex: "#F4A460" }, { name: "Brown", hex: "#A0522D" }, { name: "Sky Blue", hex: "#87CEEB" },
+            { name: "Sea Blue", hex: "#006994" }, { name: "Lavender", hex: "#E6E6FA" }, { name: "Mint", hex: "#98FF98" },
+            { name: "Peach", hex: "#FFDAB9" }, { name: "Salmon", hex: "#FA8072" }, { name: "White", hex: "#FFFFFF" },
+            { name: "Light Gray", hex: "#D1D5DB" }, { name: "Stone Gray", hex: "#818589" }, { name: "Black", hex: "#1F2937" }
+        ];
+        
+        const PRIMARY_HEX = {
+            RED: "#EF4444", YELLOW: "#EAB308", BLUE: "#3B82F6", WHITE: "#FFFFFF", BLACK: "#1F2937",
+            GREEN: "#22C55E", ORANGE: "#F97316", PURPLE: "#8B5CF6"
+        };
+
+        const knownColorsForNaming = [
+            ...paletteColors.map(c => ({ name: c.name, rgb: hexToRgb(c.hex) })),
+            { name: "Orange", rgb: hexToRgb(PRIMARY_HEX.ORANGE) }, { name: "Green", rgb: hexToRgb(PRIMARY_HEX.GREEN) },
+            { name: "Purple", rgb: hexToRgb(PRIMARY_HEX.PURPLE) }, { name: "Light Pink", rgb: hexToRgb("#FBCFE8")},
+            { name: "Light Blue", rgb: hexToRgb("#BFDBFE")}, { name: "Pale Yellow", rgb: hexToRgb("#FEF9C3")},
+            { name: "Dark Red", rgb: hexToRgb("#881337")}, { name: "Navy Blue", rgb: hexToRgb("#1E3A8A")},
+            { name: "Dark Olive", rgb: hexToRgb("#717100")}, { name: "Russet Brown", rgb: hexToRgb("#78350F")},
+            { name: "Warm Brown", rgb: hexToRgb("#7C2D12")}, { name: "Cool Gray", rgb: hexToRgb("#57534E")},
+            { name: "Dark Red", rgb: { r: 139, g: 0, b: 0 } }, { name: "Dark Blue", rgb: { r: 0, g: 0, b: 139 } },
+            { name: "Dark Green", rgb: { r: 0, g: 100, b: 0 } }, { name: "Light Yellow", rgb: { r: 255, g: 255, b: 224 } },
+            { name: "Maroon", rgb: { r: 128, g: 0, b: 0 } }, { name: "Turquoise", rgb: { r: 64, g: 224, b: 208 } },
+            { name: "Magenta", rgb: { r: 255, g: 0, b: 255 } }, { name: "Gold", rgb: { r: 255, g: 215, b: 0 } },
+            { name: "Silver", rgb: { r: 192, g: 192, b: 192 } }, { name: "Teal", rgb: { r: 0, g: 128, b: 128 } },
+            { name: "Indigo", rgb: { r: 75, g: 0, b: 130 } },
+        ];
+        
+        const colorTips = [
+            "Red, Yellow, and Blue are Primary Colors!", "Mix Red + Yellow to get Orange!", "Mix Yellow + Blue to make Green!",
+            "Blue + Red creates Purple!", "Adding White makes colors lighter!", "Adding Black makes colors darker!",
+            "Green is the color of nature!", "Purple often means royalty!", "Pink is a lighter shade of Red!"
+        ];
+
+        const MAX_SAVED_COLORS = 10; const MAX_RECIPE_LENGTH = 3;
+
+        const colorPaletteDiv = document.getElementById('colorPalette');
+        const mixingPotDiv = document.getElementById('mixingPot');
+        const potInstructionSpan = document.getElementById('potInstruction');
+        const mixedColorNameSpan = document.getElementById('mixedColorName');
+        const mixedColorHexP = document.getElementById('mixedColorHex');
+        const clearButton = document.getElementById('clearButton');
+        const ingredientDisplayDiv = document.getElementById('ingredientDisplay');
+        const ingredientTextInfoSpan = document.getElementById('ingredientTextInfo');
+        const undoButton = document.getElementById('undoButton');
+        const saveColorButton = document.getElementById('saveColorButton');
+        const savedColorsPaletteDiv = document.getElementById('savedColorsPalette');
+        const noSavedColorsMsgSpan = document.getElementById('noSavedColorsMsg');
+        const colorTipDisplayDiv = document.getElementById('colorTipDisplay');
+
+        let currentPotRgb = { r: 255, g: 255, b: 255 }; let isPotEmpty = true;
+        let mixHistory = []; let currentRecipe = []; let savedColors = []; 
+        let messageTimeout;
+        let synth = window.speechSynthesis; // Speech Synthesis API
+
+        function speak(text) {
+            if (synth && text) {
+                // Cancel any previous speech to prevent overlap
+                synth.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                // Optional: Configure voice, rate, pitch if desired
+                // utterance.lang = 'en-US';
+                // utterance.rate = 1.0; 
+                // utterance.pitch = 1.0;
+                synth.speak(utterance);
+            }
+        }
+
+        function hexToRgb(hex) {
+            if (!hex) return { r: 255, g: 255, b: 255 };
+            hex = hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i, (m, r, g, b) => r + r + g + g + b + b);
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 255, b: 255 };
+        }
+
+        function rgbToHex(r, g, b) {
+            if (r === undefined || g === undefined || b === undefined) return "#FFFFFF";
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+        }
+
+        function mixColors(rgb1, rgb2, hex1, hex2) {
+            const definedMixes = [
+                { c1: PRIMARY_HEX.RED,    c2: PRIMARY_HEX.YELLOW, resultHex: PRIMARY_HEX.ORANGE },
+                { c1: PRIMARY_HEX.YELLOW, c2: PRIMARY_HEX.BLUE,   resultHex: PRIMARY_HEX.GREEN },
+                { c1: PRIMARY_HEX.BLUE,   c2: PRIMARY_HEX.RED,    resultHex: PRIMARY_HEX.PURPLE },
+                { c1: PRIMARY_HEX.RED,    c2: PRIMARY_HEX.WHITE,  resultHex: "#FBCFE8" }, 
+                { c1: PRIMARY_HEX.BLUE,   c2: PRIMARY_HEX.WHITE,  resultHex: "#BFDBFE" }, 
+                { c1: PRIMARY_HEX.YELLOW, c2: PRIMARY_HEX.WHITE,  resultHex: "#FEF9C3" }, 
+                { c1: PRIMARY_HEX.GREEN,  c2: PRIMARY_HEX.WHITE,  resultHex: "#A7F3D0" }, 
+                { c1: PRIMARY_HEX.ORANGE, c2: PRIMARY_HEX.WHITE,  resultHex: "#FFEDD5" }, 
+                { c1: PRIMARY_HEX.PURPLE, c2: PRIMARY_HEX.WHITE,  resultHex: "#DDD6FE" }, 
+                { c1: PRIMARY_HEX.RED,    c2: PRIMARY_HEX.BLACK,  resultHex: "#881337" }, 
+                { c1: PRIMARY_HEX.BLUE,   c2: PRIMARY_HEX.BLACK,  resultHex: "#1E3A8A" }, 
+                { c1: PRIMARY_HEX.YELLOW, c2: PRIMARY_HEX.BLACK,  resultHex: "#A16207" }, 
+                { c1: PRIMARY_HEX.GREEN,  c2: PRIMARY_HEX.BLACK,  resultHex: "#14532D" }, 
+                { c1: PRIMARY_HEX.ORANGE, c2: PRIMARY_HEX.BLACK,  resultHex: "#7C2D12" }, 
+                { c1: PRIMARY_HEX.PURPLE, c2: PRIMARY_HEX.BLACK,  resultHex: "#4C1D95" }, 
+                { c1: PRIMARY_HEX.RED,    c2: PRIMARY_HEX.GREEN,  resultHex: "#78350F" }, 
+                { c1: PRIMARY_HEX.YELLOW, c2: PRIMARY_HEX.PURPLE, resultHex: "#7C2D12" }, 
+                { c1: PRIMARY_HEX.BLUE,   c2: PRIMARY_HEX.ORANGE, resultHex: "#57534E" }, 
+            ];
+            for (const mix of definedMixes) {
+                if ((mix.c1 === hex1 && mix.c2 === hex2) || (mix.c1 === hex2 && mix.c2 === hex1)) {
+                    return hexToRgb(mix.resultHex);
+                }
+            }
+            let r = Math.sqrt((rgb1.r * rgb1.r + rgb2.r * rgb2.r) / 2);
+            let g = Math.sqrt((rgb1.g * rgb1.g + rgb2.g * rgb2.g) / 2);
+            let b = Math.sqrt((rgb1.b * rgb1.b + rgb2.b * rgb2.b) / 2);
+            const whiteFactor = 0.3; const blackFactor = 0.3;
+            if (hex1 === PRIMARY_HEX.WHITE) return { r: Math.min(255, rgb2.r + (255 - rgb2.r) * whiteFactor), g: Math.min(255, rgb2.g + (255 - rgb2.g) * whiteFactor), b: Math.min(255, rgb2.b + (255 - rgb2.b) * whiteFactor) };
+            if (hex2 === PRIMARY_HEX.WHITE) return { r: Math.min(255, rgb1.r + (255 - rgb1.r) * whiteFactor), g: Math.min(255, rgb1.g + (255 - rgb1.g) * whiteFactor), b: Math.min(255, rgb1.b + (255 - rgb1.b) * whiteFactor) };
+            if (hex1 === PRIMARY_HEX.BLACK) return { r: Math.max(0, rgb2.r * (1-blackFactor)), g: Math.max(0, rgb2.g * (1-blackFactor)), b: Math.max(0, rgb2.b * (1-blackFactor)) };
+            if (hex2 === PRIMARY_HEX.BLACK) return { r: Math.max(0, rgb1.r * (1-blackFactor)), g: Math.max(0, rgb1.g * (1-blackFactor)), b: Math.max(0, rgb1.b * (1-blackFactor)) };
+            return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+        }
+
+        function getMixedColorName(mixedRgb) {
+            if (!mixedRgb) return "White";
+            let closestColorName = "Mixed Hue"; let minDistance = Infinity; const threshold = 45;
+            for (const known of knownColorsForNaming) {
+                const dist = Math.sqrt(Math.pow(mixedRgb.r - known.rgb.r, 2) + Math.pow(mixedRgb.g - known.rgb.g, 2) + Math.pow(mixedRgb.b - known.rgb.b, 2));
+                if (dist < minDistance && dist < threshold) { minDistance = dist; closestColorName = known.name; }
+            }
+            if (closestColorName === "Mixed Hue") {
+                if (mixedRgb.r < 30 && mixedRgb.g < 30 && mixedRgb.b < 30 && !(mixedRgb.r === 0 && mixedRgb.g ===0 && mixedRgb.b ===0)) closestColorName = "Very Dark";
+                else if (mixedRgb.r > 230 && mixedRgb.g > 230 && mixedRgb.b > 230 && !(mixedRgb.r === 255 && mixedRgb.g ===255 && mixedRgb.b ===255)) closestColorName = "Very Light";
+            }
+            if (mixedRgb.r === 255 && mixedRgb.g === 255 && mixedRgb.b === 255) return "White";
+            if (mixedRgb.r === 0 && mixedRgb.g === 0 && mixedRgb.b === 0) return "Black";
+            return closestColorName;
+        }
+        
+        function updateIngredientDisplay() {
+            ingredientDisplayDiv.innerHTML = ''; ingredientTextInfoSpan.style.display = 'none';
+            if (currentRecipe.length === 0 && isPotEmpty) {
+                ingredientTextInfoSpan.textContent = 'Mix something!'; ingredientTextInfoSpan.style.display = 'inline'; return;
+            }
+            if (currentRecipe.length === 0 && !isPotEmpty) {
+                 const sS = document.createElement('span'); sS.className = 'ingredient-swatch';
+                 sS.style.backgroundColor = rgbToHex(currentPotRgb.r, currentPotRgb.g, currentPotRgb.b); sS.title = getMixedColorName(currentPotRgb);
+                 ingredientDisplayDiv.appendChild(sS);
+                 const t = document.createElement('span'); t.textContent = ` is in the pot!`; t.className = 'ml-1'; ingredientDisplayDiv.appendChild(t); return;
+            }
+            currentRecipe.forEach((rgb, index) => {
+                const sw = document.createElement('span'); sw.className = 'ingredient-swatch';
+                sw.style.backgroundColor = rgbToHex(rgb.r, rgb.g, rgb.b); sw.title = getMixedColorName(rgb); ingredientDisplayDiv.appendChild(sw);
+                if (index < currentRecipe.length - 1) { const p = document.createElement('span'); p.className = 'ingredient-text'; p.textContent = '+'; ingredientDisplayDiv.appendChild(p); }
+            });
+            if (currentRecipe.length > 0 && !isPotEmpty) {
+                const eq = document.createElement('span'); eq.className = 'ingredient-text'; eq.textContent = '='; ingredientDisplayDiv.appendChild(eq);
+                const rS = document.createElement('span'); rS.className = 'ingredient-swatch';
+                rS.style.backgroundColor = rgbToHex(currentPotRgb.r, currentPotRgb.g, currentPotRgb.b); rS.title = getMixedColorName(currentPotRgb); ingredientDisplayDiv.appendChild(rS);
+            }
+        }
+
+        function updateMixingPotVisuals(speakColorName = false) {
+            const hexColor = rgbToHex(currentPotRgb.r, currentPotRgb.g, currentPotRgb.b);
+            mixingPotDiv.style.backgroundColor = hexColor;
+            const potBrightness = (currentPotRgb.r * 299 + currentPotRgb.g * 587 + currentPotRgb.b * 114) / 1000;
+            mixingPotDiv.style.borderColor = potBrightness > 128 ? brightenColor(hexColor, -30) : brightenColor(hexColor, 30);
+            const colorName = getMixedColorName(currentPotRgb);
+            mixedColorNameSpan.textContent = colorName;
+            mixedColorHexP.textContent = hexColor;
+
+            if (speakColorName && !isPotEmpty) {
+                speak(colorName);
+            }
+
+            if (isPotEmpty) {
+                potInstructionSpan.style.opacity = '1';
+                mixingPotDiv.classList.add('border-dashed'); mixingPotDiv.classList.remove('border-solid');
+                saveColorButton.disabled = true;
+            } else {
+                potInstructionSpan.style.opacity = '0';
+                mixingPotDiv.classList.remove('border-dashed'); mixingPotDiv.classList.add('border-solid');
+                saveColorButton.disabled = false;
+            }
+            undoButton.disabled = mixHistory.length === 0;
+            updateIngredientDisplay();
+        }
+        
+        function brightenColor(hex, percent) {
+            let {r, g, b} = hexToRgb(hex); const factor = 1 + percent / 100;
+            r = Math.max(0, Math.min(255, Math.round(r * factor))); g = Math.max(0, Math.min(255, Math.round(g * factor))); b = Math.max(0, Math.min(255, Math.round(b * factor)));
+            return rgbToHex(r,g,b);
+        }
+        
+        function playMixingAnimation() {
+            mixingPotDiv.classList.add('mixing');
+            mixingPotDiv.addEventListener('animationend', () => mixingPotDiv.classList.remove('mixing'), { once: true });
+        }
+
+        function handleDragStart(event, colorData, swatchElement) {
+            event.dataTransfer.setData("application/json", JSON.stringify(colorData));
+            event.dataTransfer.effectAllowed = "move";
+            swatchElement.classList.add('dragging');
+            speak(colorData.name); // Speak color name on drag start
+        }
+
+        function handleDragEnd(event, swatchElement) {
+             if (swatchElement) swatchElement.classList.remove('dragging');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault(); event.dataTransfer.dropEffect = "move";
+            mixingPotDiv.classList.add('border-purple-400', 'border-solid'); 
+            mixingPotDiv.classList.remove('border-gray-400', 'border-dashed');
+        }
+        function handleDragLeave(event) {
+            mixingPotDiv.classList.remove('border-purple-400');
+            if(isPotEmpty) mixingPotDiv.classList.add('border-gray-400', 'border-dashed');
+            else mixingPotDiv.classList.add('border-solid');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            mixingPotDiv.classList.remove('border-purple-400');
+            if(isPotEmpty) mixingPotDiv.classList.add('border-gray-400', 'border-dashed');
+
+            try {
+                const colorDataString = event.dataTransfer.getData("application/json"); if (!colorDataString) return;
+                const droppedColor = JSON.parse(colorDataString); const droppedRgb = hexToRgb(droppedColor.hex); if (!droppedRgb) return;
+
+                mixHistory.push({ potRgb: { ...currentPotRgb }, recipe: [...currentRecipe], isEmpty: isPotEmpty });
+                playMixingAnimation(); 
+                const potHexBeforeMix = isPotEmpty ? PRIMARY_HEX.WHITE : rgbToHex(currentPotRgb.r, currentPotRgb.g, currentPotRgb.b);
+
+                if (isPotEmpty) {
+                    currentPotRgb = droppedRgb; currentRecipe = [droppedRgb]; isPotEmpty = false;
+                } else {
+                    currentPotRgb = mixColors(currentPotRgb, droppedRgb, potHexBeforeMix, droppedColor.hex);
+                    currentRecipe.push(droppedRgb);
+                    if (currentRecipe.length > MAX_RECIPE_LENGTH) currentRecipe.shift();
+                }
+                updateMixingPotVisuals(true); // Pass true to speak the new color name
+                showRandomColorTip();
+            } catch (e) { console.error("Error processing dropped color:", e); }
+        }
+        
+        function handleUndo() {
+            if (mixHistory.length > 0) {
+                const prevState = mixHistory.pop();
+                currentPotRgb = prevState.potRgb; currentRecipe = prevState.recipe; isPotEmpty = prevState.isEmpty;
+                updateMixingPotVisuals(true); // Speak the restored color name
+            }
+        }
+
+        function handleClearMixer() {
+            mixHistory.push({ potRgb: { ...currentPotRgb }, recipe: [...currentRecipe], isEmpty: isPotEmpty });
+            mixingPotDiv.classList.add('clearing');
+            mixingPotDiv.addEventListener('animationend', () => {
+                mixingPotDiv.classList.remove('clearing');
+                currentPotRgb = { r: 255, g: 255, b: 255 }; isPotEmpty = true; currentRecipe = [];
+                updateMixingPotVisuals(); speak("Cleared");
+            }, { once: true });
+        }
+        
+        function handleSaveColor() {
+            if (!isPotEmpty && savedColors.length < MAX_SAVED_COLORS) {
+                const name = getMixedColorName(currentPotRgb);
+                const existing = savedColors.find(c => c.rgb.r === currentPotRgb.r && c.rgb.g === currentPotRgb.g && c.rgb.b === currentPotRgb.b);
+                if (!existing) {
+                    savedColors.push({ name: name, rgb: { ...currentPotRgb } }); renderSavedColors();
+                    showUserMessage("Color saved! 💖", "success"); speak("Color saved");
+                } else {
+                    showUserMessage("This color is already saved!", "info"); speak("Already saved");
+                }
+            } else if (savedColors.length >= MAX_SAVED_COLORS) {
+                 showUserMessage(`Max ${MAX_SAVED_COLORS} colors saved!`, "warn"); speak("Cannot save, storage full");
+            }
+        }
+        
+        function renderSavedColors() {
+            savedColorsPaletteDiv.innerHTML = ''; 
+            if (savedColors.length === 0) {
+                noSavedColorsMsgSpan.style.display = 'block'; savedColorsPaletteDiv.appendChild(noSavedColorsMsgSpan);
+            } else {
+                noSavedColorsMsgSpan.style.display = 'none';
+                savedColors.forEach((color, index) => {
+                    const swatch = document.createElement('div'); swatch.className = 'saved-color-swatch';
+                    swatch.style.backgroundColor = rgbToHex(color.rgb.r, color.rgb.g, color.rgb.b);
+                    swatch.title = `${color.name} (Click to use, Double-click to remove)`;
+                    swatch.addEventListener('click', () => loadSavedColor(color.rgb, color.name));
+                    swatch.addEventListener('dblclick', () => removeSavedColor(index));
+                    savedColorsPaletteDiv.appendChild(swatch);
+                });
+            }
+        }
+
+        function loadSavedColor(rgb, name) {
+            mixHistory.push({ potRgb: { ...currentPotRgb }, recipe: [...currentRecipe], isEmpty: isPotEmpty });
+            currentPotRgb = { ...rgb }; currentRecipe = []; isPotEmpty = false;
+            updateMixingPotVisuals(); speak(`Loaded ${name}`);
+        }
+        
+        function removeSavedColor(indexToRemove) {
+            const removedColorName = savedColors[indexToRemove].name;
+            savedColors.splice(indexToRemove, 1); renderSavedColors();
+            showUserMessage("Saved color removed.", "info"); speak(`${removedColorName} removed`);
+        }
+
+        function showUserMessage(message, type = "info") {
+            clearTimeout(messageTimeout); colorTipDisplayDiv.style.opacity = '0';
+            setTimeout(() => { 
+                let icon = "💡"; let bgColor = "rgba(224, 231, 255, 0.8)"; let textColor = "#3730a3";
+                if (type === "warn") { icon = "⚠️"; bgColor = "rgba(254, 249, 195, 0.85)"; textColor = "#713f12"; }
+                else if (type === "error") { icon = "❌"; bgColor = "rgba(254, 226, 226, 0.85)"; textColor = "#7f1d1d"; }
+                else if (type === "success"){ icon = "✅"; bgColor = "rgba(220, 252, 231, 0.85)"; textColor = "#14532d"; }
+                else if (type === "tip") { icon = "💡"; bgColor = "rgba(255, 255, 255, 0.7)"; textColor = "#5A3E8A"; }
+                colorTipDisplayDiv.textContent = `${icon} ${message}`;
+                colorTipDisplayDiv.style.backgroundColor = bgColor; colorTipDisplayDiv.style.color = textColor;
+                colorTipDisplayDiv.style.opacity = '1';
+            }, 50);
+            messageTimeout = setTimeout(() => { colorTipDisplayDiv.style.opacity = '0'; }, type === "tip" ? 5000 : 3000);
+        }
+        
+        function showRandomColorTip() {
+            const randomTip = colorTips[Math.floor(Math.random() * colorTips.length)];
+            showUserMessage(randomTip, "tip");
+        }
+
+        function initializePalette() {
+            paletteColors.forEach(color => {
+                const container = document.createElement('div'); container.className = 'color-swatch-container';
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch w-10 h-10 sm:w-12 sm:h-12 rounded-lg cursor-grab';
+                swatch.style.backgroundColor = color.hex; swatch.draggable = true;
+                const label = document.createElement('div'); label.className = 'color-label'; label.textContent = color.name;
+                container.appendChild(swatch); container.appendChild(label);
+                swatch.addEventListener('dragstart', (e) => handleDragStart(e, color, swatch));
+                swatch.addEventListener('dragend', (e) => handleDragEnd(e, swatch));
+                // Speak color name when a palette swatch is clicked (for accessibility/non-drag interaction)
+                swatch.addEventListener('click', () => speak(color.name)); 
+                colorPaletteDiv.appendChild(container);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for Speech Synthesis support
+            if (!('speechSynthesis' in window)) {
+                console.warn("Speech Synthesis not supported in this browser.");
+                // Optionally, disable sound-related UI or inform the user
+                // For now, the speak() function will just do nothing if synth is undefined.
+            }
+
+            initializePalette(); renderSavedColors(); updateMixingPotVisuals(); 
+            mixingPotDiv.addEventListener('dragover', handleDragOver);
+            mixingPotDiv.addEventListener('dragleave', handleDragLeave);
+            mixingPotDiv.addEventListener('drop', handleDrop);
+            clearButton.addEventListener('click', handleClearMixer);
+            undoButton.addEventListener('click', handleUndo);
+            saveColorButton.addEventListener('click', handleSaveColor);
+            setTimeout(showRandomColorTip, 1500);
+        });
+    </script>
+</body>
+</html>
